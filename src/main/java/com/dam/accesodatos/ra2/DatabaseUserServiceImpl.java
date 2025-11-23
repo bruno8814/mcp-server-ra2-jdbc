@@ -7,6 +7,8 @@ import com.dam.accesodatos.model.UserQueryDto;
 import com.dam.accesodatos.model.UserUpdateDto;
 import org.springframework.stereotype.Service;
 
+import javax.xml.crypto.Data;
+import javax.xml.transform.Result;
 import java.sql.*;
 import java.time.LocalDateTime;
 import java.util.ArrayList;
@@ -242,24 +244,127 @@ public class DatabaseUserServiceImpl implements DatabaseUserService {
 
     @Override
     public boolean deleteUser(Long id) {
-        throw new UnsupportedOperationException("TODO: Método deleteUser() para implementar por estudiantes");
+        //throw new UnsupportedOperationException("TODO: Método deleteUser() para implementar por estudiantes");
+
+        User existing = findUserById(id);
+        if (existing == null){
+            return false;
+        }
+
+        String sql = "DELETE FROM users WHERE id = ?";
+
+        try (Connection conexion = DatabaseConfig.getConnection();
+        PreparedStatement preparedStatement = conexion.prepareStatement(sql)) {
+
+            preparedStatement.setLong(1, id);
+            int affectedRows = preparedStatement.executeUpdate();
+            if (affectedRows == 0) {
+                return false;
+            }
+
+            return true;
+
+        } catch (SQLException e) {
+            e.printStackTrace();
+            return false;
+        }
+
     }
 
     @Override
     public List<User> findAll() {
-        throw new UnsupportedOperationException("TODO: Método findAll() para implementar por estudiantes");
+        //throw new UnsupportedOperationException("TODO: Método findAll() para implementar por estudiantes");
+
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT * FROM users ORDER BY created_at DESC";
+
+        try(Connection conexion = DatabaseConfig.getConnection();
+        PreparedStatement preparedStatement = conexion.prepareStatement(sql)){
+
+            ResultSet rs = preparedStatement.executeQuery();
+
+            while (rs.next()){
+
+                User user = new User();
+                user.setId(rs.getLong("id"));
+                user.setName(rs.getString("name"));
+                user.setEmail(rs.getString("email"));
+                users.add(user);
+
+            }
+
+        }catch (SQLException e){
+            e.printStackTrace();
+            return List.of();
+        }
+
+        return users;
     }
 
     // ========== CE2.c: Advanced Queries ==========
 
     @Override
     public List<User> findUsersByDepartment(String department) {
-        throw new UnsupportedOperationException("TODO: Método findUsersByDepartment() para implementar por estudiantes");
+        //throw new UnsupportedOperationException("TODO: Método findUsersByDepartment() para implementar por estudiantes");
+
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT * FROM users WHERE department = ? AND ACTIVE = true";
+
+        try(Connection conexion = DatabaseConfig.getConnection();
+        PreparedStatement preparedStatement = conexion.prepareStatement(sql)){
+
+          preparedStatement.setString(1, department);
+          ResultSet rs = preparedStatement.executeQuery();
+
+            while (rs.next()){
+
+                User user = new User();
+                user.setId(rs.getLong("id"));
+                user.setName(rs.getString("name"));
+                user.setEmail(rs.getString("email"));
+                user.setDepartment(rs.getString("departament"));
+                users.add(user);
+
+            }
+
+        }catch (SQLException e){
+            e.printStackTrace();
+            return List.of();
+        }
+        return users;
+
     }
 
     @Override
     public List<User> searchUsers(UserQueryDto query) {
-        throw new UnsupportedOperationException("TODO: Método searchUsers() para implementar por estudiantes");
+        //throw new UnsupportedOperationException("TODO: Método searchUsers() para implementar por estudiantes");
+
+        List<User> users = new ArrayList<>();
+        String sql = "SELECT * FROM users WHERE department LIKE ? or active LIKE ? LIMIT 10";
+
+        try(Connection conexion = DatabaseConfig.getConnection();
+        PreparedStatement preparedStatement = conexion.prepareStatement(sql)){
+
+            ResultSet rs = preparedStatement.executeQuery();
+
+            while (rs.next()){
+                User user = new User();
+                user.setId(rs.getLong("id"));
+                user.setName(rs.getString("name"));
+                user.setEmail(rs.getString("email"));
+                user.setDepartment(rs.getString("departament"));
+                user.setActive(rs.getBoolean("active"));
+                users.add(user);
+
+
+            }
+
+        }catch (SQLException e){
+            e.printStackTrace();
+            return List.of();
+        }
+        return users;
+
     }
 
 
@@ -340,7 +445,53 @@ public class DatabaseUserServiceImpl implements DatabaseUserService {
 
     @Override
     public int batchInsertUsers(List<User> users) {
-        throw new UnsupportedOperationException("TODO: Método batchInsertUsers() para implementar por estudiantes");
+        //throw new UnsupportedOperationException("TODO: Método batchInsertUsers() para implementar por estudiantes");
+
+        try (Connection c = DatabaseConfig.getConnection();) {
+
+            c.setAutoCommit(false);
+            String sql = "INSERT INTO users (name, email, department, role, active, created_at, updated_at) " +
+                         "VALUES (?, ?, ?, ?, ?, ?, ?)";
+
+            try(PreparedStatement p = c.prepareStatement(sql)){
+
+                for (User user : users) {
+                    p.setString(1, user.getName());
+                    p.setString(2, user.getEmail());
+                    p.setString(3, user.getDepartment());
+                    p.setString(4, user.getRole());
+                    p.setBoolean(5, user.getActive() != null ? user.getActive() : true);
+                    p.setTimestamp(6, Timestamp.valueOf(user.getCreatedAt() != null ? user.getCreatedAt() : LocalDateTime.now()));
+                    p.setTimestamp(7, Timestamp.valueOf(LocalDateTime.now()));
+                    p.addBatch();
+                }
+
+                int [] count = p.executeBatch();
+                c.commit();
+                int total = 0;
+                for (int i : count) {
+                    if (i == Statement.SUCCESS_NO_INFO || i >= 0) {
+
+                        total++;
+
+                    }
+                }
+
+                if (total != users.size()){
+                    throw new RuntimeException("Error al insertar usuarios");
+                }
+                return total;
+
+            }catch (SQLException e){
+                System.err.println("Error al insertar usuarios: " + e.getMessage());
+                c.rollback();
+                throw new RuntimeException("Error al insertar usuarios"+ e.getMessage(), e);
+            }
+
+        }catch (SQLException e){
+
+            throw new RuntimeException("Error en la base de datos"+ e.getMessage(), e);
+        }
     }
 
     // ========== CE2.e: Metadata ==========
